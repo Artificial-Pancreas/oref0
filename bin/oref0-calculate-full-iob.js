@@ -44,14 +44,19 @@ var oref0_calculate_iob = function oref0_calculate_iob(argv_params) {
 
   var pumphistory_input = inputs[0];
   var profile_input = inputs[1];
-  var clock_input = inputs[2];
-  var autosens_input = inputs[3];
-  var pumphistory_24_input = inputs[4];
+  var time_from = typeof inputs[2] === 'string' ? new Date(Date.parse(inputs[2])) : undefined;
+  var time_until = typeof inputs[3] === 'string' ? new Date(Date.parse(inputs[3])) : undefined;
+  var autosens_input = inputs[4];
+  var pumphistory_24_input = inputs[5];
+
+  if (!time_from || !time_until) {
+    console.error("time_from and time_until are required")
+    return
+  }
 
   var cwd = process.cwd();
   var pumphistory_data = JSON.parse(fs.readFileSync(pumphistory_input));
   var profile_data = JSON.parse(fs.readFileSync(profile_input));
-  var clock_data = JSON.parse(fs.readFileSync(clock_input));
 
   var autosens_data = null;
   if (autosens_input && autosens_input !== '') {
@@ -69,18 +74,30 @@ var oref0_calculate_iob = function oref0_calculate_iob(argv_params) {
 
   // pumphistory_data.sort(function (a, b) { return a.date > b.date });
 
-  inputs = {
-    history: pumphistory_data
-  , history24: pumphistory_24_data
-  , profile: profile_data
-  , clock: clock_data
-  };
-  if ( autosens_data ) {
-    inputs.autosens = autosens_data;
-  }
+  var now = time_until
+  var all_iob = []
+  while (now >= time_from) {
+    inputs = {
+      history: pumphistory_data
+      , history24: pumphistory_24_data
+      , profile: profile_data
+      , clock: now.toISOString()
+    };
+    if (autosens_data) {
+      inputs.autosens = autosens_data;
+    }
 
-  var iob = generate(inputs);
-  return(JSON.stringify(iob));
+    var iob = generate(inputs);
+    if (iob.length > 0) {
+      if (now === time_until) {
+        all_iob = iob
+      } else {
+        all_iob.unshift(iob[0])
+      }
+    }
+    now = new Date(now.getTime() - 5 * 60 * 1000)
+  }
+  return(JSON.stringify(all_iob));
 }
 
 if (!module.parent) {
